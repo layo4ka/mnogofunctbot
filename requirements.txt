@@ -5,3 +5,4 @@ aiohttp
 browser-cookie3
 python-dotenv
 aspose-words
+aiogram
