@@ -11,8 +11,7 @@ from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, Buffered
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # Импорты для конвертации документов
-from pdf2docx import Converter
-from docx2pdf import convert
+import aspose.words as aw
 from PIL import Image
 
 # Импорт для загрузки видео
@@ -139,101 +138,66 @@ async def handle_document(message: Message):
 
 async def convert_pdf_to_docx(message: Message, document):
     """Конвертация PDF в DOCX"""
-    status_msg = await message.answer("🔄 Конвертирую PDF в DOCX...")
+# ==================== КОНВЕРТАЦИЯ ДОКУМЕНТОВ ====================
+@router.message(F.document)
+async def handle_document(message: Message):
+    """Обработчик документов для конвертации PDF <=> DOCX"""
+    document = message.document
+    file_name = document.file_name
+
+    if not file_name:
+        await message.answer("❌ Не удалось определить имя файла.")
+        return
+
+    # Проверяем, подходит ли файл
+    is_pdf = file_name.lower().endswith('.pdf')
+    is_docx = file_name.lower().endswith('.docx')
+
+    if not is_pdf and not is_docx:
+        await message.answer(
+            "⚠️ Я работаю только с файлами .pdf и .docx\n"
+            "Пришлите документ в одном из этих форматов."
+        )
+        return
+
+    # Определяем, во что конвертировать
+    if is_pdf:
+        status_text = "🔄 Конвертирую PDF в DOCX..."
+        output_extension = '.docx'
+    else: # is_docx
+        status_text = "🔄 Конвертирую DOCX в PDF..."
+        output_extension = '.pdf'
+
+    status_msg = await message.answer(status_text)
     
+    # Запускаем конвертацию
     try:
         # Скачиваем файл
         file = await bot.get_file(document.file_id)
-        file_bytes = await bot.download_file(file.file_path)
+        file_bytes_io = await bot.download_file(file.file_path)
         
-        # Создаём временные файлы
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as pdf_temp:
-            pdf_temp.write(file_bytes.read())
-            pdf_path = pdf_temp.name
+        # Конвертируем с помощью Aspose.Words
+        doc = aw.Document(file_bytes_io)
         
-        with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as docx_temp:
-            docx_path = docx_temp.name
+        # Сохраняем результат в байтовый поток
+        output_buffer = io.BytesIO()
+        doc.save(output_buffer, aw.SaveFormat.DOCX if is_pdf else aw.SaveFormat.PDF)
+        output_buffer.seek(0)
         
-        try:
-            # Конвертируем
-            cv = Converter(pdf_path)
-            cv.convert(docx_path)
-            cv.close()
-            
-            # Читаем результат
-            with open(docx_path, 'rb') as docx_file:
-                docx_data = docx_file.read()
-            
-            # Формируем имя файла
-            new_filename = document.file_name.rsplit('.', 1)[0] + '.docx'
-            
-            # Отправляем
-            input_file = BufferedInputFile(docx_data, filename=new_filename)
-            await message.answer_document(
-                input_file,
-                caption="✅ Готово! Ваш файл конвертирован в DOCX."
-            )
-            
-        finally:
-            # Удаляем временные файлы
-            os.unlink(pdf_path)
-            os.unlink(docx_path)
+        # Формируем новое имя файла
+        new_filename = file_name.rsplit('.', 1)[0] + output_extension
         
+        # Отправляем документ
+        input_file = BufferedInputFile(output_buffer.read(), filename=new_filename)
+        await message.answer_document(
+            input_file,
+            caption=f"✅ Готово! Ваш файл конвертирован в {output_extension.upper()}."
+        )
         await status_msg.delete()
-        
+
     except Exception as e:
         await status_msg.edit_text(f"❌ Ошибка при конвертации: {str(e)}")
 
-
-async def convert_docx_to_pdf(message: Message, document):
-    """Конвертация DOCX в PDF"""
-    status_msg = await message.answer("🔄 Конвертирую DOCX в PDF...")
-    
-    try:
-        # Скачиваем файл
-        file = await bot.get_file(document.file_id)
-        file_bytes = await bot.download_file(file.file_path)
-        
-        # Создаём временные файлы
-        with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as docx_temp:
-            docx_temp.write(file_bytes.read())
-            docx_path = docx_temp.name
-        
-        # Путь для PDF
-        pdf_path = docx_path.rsplit('.', 1)[0] + '.pdf'
-        
-        try:
-            # Конвертируем (для Linux может потребоваться LibreOffice)
-            convert(docx_path, pdf_path)
-            
-            # Читаем результат
-            with open(pdf_path, 'rb') as pdf_file:
-                pdf_data = pdf_file.read()
-            
-            # Формируем имя файла
-            new_filename = document.file_name.rsplit('.', 1)[0] + '.pdf'
-            
-            # Отправляем
-            input_file = BufferedInputFile(pdf_data, filename=new_filename)
-            await message.answer_document(
-                input_file,
-                caption="✅ Готово! Ваш файл конвертирован в PDF."
-            )
-            
-        finally:
-            # Удаляем временные файлы
-            os.unlink(docx_path)
-            if os.path.exists(pdf_path):
-                os.unlink(pdf_path)
-        
-        await status_msg.delete()
-        
-    except Exception as e:
-        await status_msg.edit_text(
-            f"❌ Ошибка при конвертации: {str(e)}\n\n"
-            "💡 Для DOCX→PDF на Linux требуется установить LibreOffice:\n"
-            "<code>sudo apt install libreoffice</code>"
-        )
 
 
 # ==================== ЗАГРУЗКА ВИДЕО ====================
