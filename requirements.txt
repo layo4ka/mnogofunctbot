@@ -4,4 +4,4 @@ docx2pdf==0.1.8
 Pillow==10.2.0
 yt-dlp>=2024.8.6
 aiohttp>=3.9.0
-browser-cookie3>=0.19.1  # опционально, для загрузки через cookies
+browser-cookie3>=0.19.1  
