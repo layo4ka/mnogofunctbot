@@ -113,35 +113,10 @@ async def cmd_update_ytdlp(message: Message):
         await status_msg.edit_text(f"❌ Ошибка: {str(e)}")
 
 
-# ==================== КОНВЕРТАЦИЯ PDF → DOCX ====================
-@router.message(F.document)
-async def handle_document(message: Message):
-    """Обработчик документов"""
-    document = message.document
-    file_name = document.file_name
-    
-    if not file_name:
-        await message.answer("❌ Не удалось определить имя файла.")
-        return
-    
-    # Проверяем расширение
-    if file_name.lower().endswith('.pdf'):
-        await convert_pdf_to_docx(message, document)
-    elif file_name.lower().endswith('.docx'):
-        await convert_docx_to_pdf(message, document)
-    else:
-        await message.answer(
-            "⚠️ Я работаю только с файлами .pdf и .docx\n"
-            "Пришлите документ в одном из этих форматов."
-        )
-
-
-async def convert_pdf_to_docx(message: Message, document):
-    """Конвертация PDF в DOCX"""
 # ==================== КОНВЕРТАЦИЯ ДОКУМЕНТОВ ====================
 @router.message(F.document)
 async def handle_document(message: Message):
-    """Обработчик документов для конвертации PDF <=> DOCX"""
+    """Универсальный обработчик документов для конвертации PDF <=> DOCX"""
     document = message.document
     file_name = document.file_name
 
@@ -154,10 +129,7 @@ async def handle_document(message: Message):
     is_docx = file_name.lower().endswith('.docx')
 
     if not is_pdf and not is_docx:
-        await message.answer(
-            "⚠️ Я работаю только с файлами .pdf и .docx\n"
-            "Пришлите документ в одном из этих форматов."
-        )
+        # Если это не PDF и не DOCX, ничего не делаем, чтобы обработчик фото сработал
         return
 
     # Определяем, во что конвертировать
@@ -181,7 +153,9 @@ async def handle_document(message: Message):
         
         # Сохраняем результат в байтовый поток
         output_buffer = io.BytesIO()
-        doc.save(output_buffer, aw.SaveFormat.DOCX if is_pdf else aw.SaveFormat.PDF)
+        # Определяем формат сохранения для Aspose
+        save_format = aw.SaveFormat.DOCX if is_pdf else aw.SaveFormat.PDF
+        doc.save(output_buffer, save_format)
         output_buffer.seek(0)
         
         # Формируем новое имя файла
@@ -197,6 +171,7 @@ async def handle_document(message: Message):
 
     except Exception as e:
         await status_msg.edit_text(f"❌ Ошибка при конвертации: {str(e)}")
+
 
 
 
