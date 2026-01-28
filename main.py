@@ -1,6 +1,9 @@
 import asyncio
 import io
 import os
+
+os.environ['DOTNET_SYSTEM_GLOBALIZATION_INVARIANT'] = '1'
+
 import tempfile
 from pathlib import Path
 import re
